@@ -1,155 +1,190 @@
-import pygame
-import random
-import math
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة صياد الطيور</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #222;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            cursor: crosshair;
+        }
+        #info {
+            margin-top: 10px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
 
-# إعدادات الشاشة والألوان
-pygame.init()
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("لعبة صياد الطيور والكلب الذكي")
-clock = pygame.time.Clock()
+    <h1>لعبة صياد الطيور</h1>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <div id="info">اضغط بالماوس على الطائر لإطلاق النار وصيده!</div>
 
-WHITE = (255, 255, 255)
-GREEN = (34, 139, 34)
-BLUE = (135, 206, 235)
-BROWN = (139, 69, 19)
-RED = (255, 0, 0)
-BLACK = (0, 0, 0)
-YELLOW = (255, 215, 0)
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
 
-# العدادات
-hits = 0
-misses = 0
-font = pygame.font.SysFont("Arial", 24)
+        // إعدادات النقاط
+        let score = 0;
+        let ammo = 3;
 
-# فئة الطائر
-class Bird:
-    def __init__(self):
-        self.reset()
+        // إعدادات الطائر (الفريسة)
+        let bird = {
+            x: 100,
+            y: 150,
+            radius: 20,
+            speedX: 3,
+            speedY: 2,
+            alive: true
+        };
 
-    def reset(self):
-        self.x = -50
-        self.y = random.randint(50, 300)
-        self.speed = random.randint(3, 7)
-        self.alive = True
-        self.falling = False
+        // تحديث موقع الطائر
+        function updateBird() {
+            if (bird.alive) {
+                bird.x += bird.speedX;
+                bird.y += bird.speedY;
 
-    def update(self):
-        if self.alive and not self.falling:
-            self.x += self.speed
-            if self.x > SCREEN_WIDTH:
-                self.reset()
-        elif self.falling:
-            self.y += 8  # سرعة السقوط
-            if self.y >= SCREEN_HEIGHT - 70: # سقط على العشب
-                self.falling = False
+                // ارتطام الحواف لكي يستمر الطائر في الحركة داخل الشاشة
+                if (bird.x - bird.radius < 0 || bird.x + bird.radius > canvas.width) {
+                    bird.speedX *= -1;
+                }
+                if (bird.y - bird.radius < 0 || bird.y + bird.radius > canvas.height - 150) {
+                    bird.speedY *= -1;
+                }
+            } else {
+                // إذا أصيب الطائر، يسقط للأرض
+                bird.y += 6;
+                if (bird.y > canvas.height - 100) {
+                    // إعادة ظهوره من جديد بعد السقوط
+                    resetBird();
+                }
+            }
+        }
 
-    def draw(self):
-        if self.alive or self.falling:
-            # رسم طائر مبسط (جسم وجناح)
-            pygame.draw.ellipse(screen, RED if self.falling else BROWN, (self.x, self.y, 40, 25))
-            pygame.draw.polygon(screen, WHITE, [(self.x+15, self.y), (self.x+25, self.y-15), (self.x+20, self.y)])
+        function resetBird() {
+            bird.x = Math.random() * (canvas.width - 200) + 100;
+            bird.y = Math.random() * 150 + 50;
+            bird.speedX = (Math.random() - 0.5) * 6;
+            bird.speedY = (Math.random() - 0.5) * 4;
+            if(bird.speedX === 0) bird.speedX = 2;
+            bird.alive = true;
+        }
 
-# فئة الكلب
-class Dog:
-    def __init__(self):
-        self.x = 200
-        self.y = SCREEN_HEIGHT - 80
-        self.speed = 5
-        self.state = "IDLE" # IDLE, FETCHING, RETURNING
-        self.target_bird = None
+        // رسم خلفية الحقل، الصياد، السلة، والكلب
+        function drawScene() {
+            // السماء
+            ctx.fillStyle = "#87CEEB";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    def update(self, bird, basket_x):
-        if self.state == "IDLE" and bird.falling and bird.y >= SCREEN_HEIGHT - 85:
-            self.state = "FETCHING"
-            self.target_bird = bird
+            // الأرض / الحقل
+            ctx.fillStyle = "#228B22";
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
 
-        if self.state == "FETCHING":
-            if self.x < self.target_bird.x:
-                self.x += self.speed
-            elif self.x > self.target_bird.x:
-                self.x -= self.speed
-            
-            # عند الوصول للطائر، يمسكه ويعود
-            if abs(self.x - self.target_bird.x) < 10:
-                self.target_bird.alive = False
-                self.state = "RETURNING"
+            // --- رسم الصياد وبجواره السلة ---
+            // جسم الصياد
+            ctx.fillStyle = "#00008B";
+            ctx.fillRect(100, canvas.height - 180, 40, 80);
+            // رأس الصياد
+            ctx.beginPath();
+            ctx.arc(120, canvas.height - 195, 15, 0, Math.PI * 2);
+            ctx.fillStyle = "#FFDAB9";
+            ctx.fill();
+            ctx.closePath();
+            // البندقية
+            ctx.strokeStyle = "#444";
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(120, canvas.height - 150);
+            ctx.lineTo(160, canvas.height - 160);
+            ctx.stroke();
 
-        if self.state == "RETURNING":
-            if self.x > basket_x:
-                self.x -= self.speed
-            elif self.x < basket_x:
-                self.x += self.speed
-            
-            # عند الوصول للسلة يضع الطائر ويعود لنقطة البداية
-            if abs(self.x - basket_x) < 10:
-                self.state = "IDLE"
-                bird.reset()
+            // السلة بجوار الصياد
+            ctx.fillStyle = "#D2B48C";
+            ctx.fillRect(50, canvas.height - 130, 40, 30);
+            ctx.strokeStyle = "#8B4513";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(50, canvas.height - 130, 40, 30);
 
-    def draw(self):
-        # رسم كلب مبسط
-        pygame.draw.rect(screen, YELLOW, (self.x, self.y, 50, 30)) # الجسم
-        pygame.draw.rect(screen, YELLOW, (self.x + 35, self.y - 15, 15, 15)) # الرأس
+            // --- رسم الكلب ---
+            ctx.fillStyle = "#A0522D";
+            // جسم الكلب
+            ctx.fillRect(170, canvas.height - 120, 50, 25);
+            // رأس الكلب
+            ctx.fillRect(210, canvas.height - 135, 20, 20);
+            // أرجل الكلب
+            ctx.fillRect(180, canvas.height - 95, 6, 15);
+            ctx.fillRect(205, canvas.height - 95, 6, 15);
 
-# كائنات اللعبة
-bird = Bird()
-dog = Dog()
-hunter_x, hunter_y = 100, SCREEN_HEIGHT - 100
-basket_x, basket_y = 50, SCREEN_HEIGHT - 80
+            // --- رسم لوحة النتائج في الأعلى ---
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.fillRect(0, 0, canvas.width, 40);
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText("النقاط: " + score, 30, 27);
+            ctx.fillText("الذخيرة: " + ammo, canvas.width - 120, 27);
 
-# حلقة اللعبة الرئيسية
-running = True
-while running:
-    screen.fill(BLUE) # السماء
-    pygame.draw.rect(screen, GREEN, (0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 60)) # الحقل
-    pygame.draw.rect(screen, BLACK, (basket_x, basket_y, 40, 30)) # السلة
+            // --- رسم الطائر (الفريسة) ---
+            if (bird.alive) {
+                ctx.fillStyle = "#FF4500";
+                ctx.beginPath();
+                ctx.arc(bird.x, bird.y, bird.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+                // أجنحة بسيطة
+                ctx.fillStyle = "#FF8C00";
+                ctx.beginPath();
+                ctx.arc(bird.x, bird.y - 10, 10, 0, Math.PI);
+                ctx.fill();
+                ctx.closePath();
+            } else {
+                // شكل الطائر الساقط
+                ctx.fillStyle = "#8B0000";
+                ctx.beginPath();
+                ctx.arc(bird.x, bird.y, bird.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
 
-    # أحداث اللعبة
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1: # ضغطة ماوس يسار
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-            
-            # التحقق من إصابة الطائر
-            if bird.alive and not bird.falling:
-                # حساب المسافة بين الضغطة ومركز الطائر
-                distance = math.hypot((bird.x + 20) - mouse_x, (bird.y + 12) - mouse_y)
-                if distance < 30: # الطائر أصيب
-                    bird.falling = True
-                    hits += 1
-                else:
-                    misses += 1
-            else:
-                misses += 1
+        // حلقة اللعبة الرئيسية
+        function gameLoop() {
+            updateBird();
+            drawScene();
+            requestAnimationFrame(gameLoop);
+        }
 
-    # تحديث الكائنات
-    bird.update()
-    dog.update(bird, basket_x)
+        // التفاعل عند النقر (إطلاق النار)
+        canvas.addEventListener("click", function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
 
-    # رسم الصياد والبندقية (تتجه نحو الماوس)
-    mouse_x, mouse_y = pygame.mouse.get_pos()
-    angle = math.atan2(mouse_y - hunter_y, mouse_x - hunter_x)
-    gun_end_x = hunter_x + 40 * math.cos(angle)
-    gun_end_y = hunter_y + 40 * math.sin(angle)
-    
-    pygame.draw.circle(screen, BLACK, (hunter_x, hunter_y), 20) # الصياد
-    pygame.draw.line(screen, BROWN, (hunter_x, hunter_y), (gun_end_x, gun_end_y), 5) # البندقية
+            // حساب المسافة بين النقر ومكان الطائر
+            const distance = Math.hypot(mouseX - bird.x, mouseY - bird.y);
 
-    # رسم الطائر والكلب
-    bird.draw()
-    dog.draw()
+            if (bird.alive && distance < bird.radius + 10) {
+                bird.alive = false;
+                score += 10; // زيادة النقاط عند الإصابة
+            }
+        });
 
-    # عرض العدادات
-    hit_text = font.render(f"Hits (Caught): {hits}", True, BLACK)
-    miss_text = font.render(f"Misses: {misses}", True, BLACK)
-    screen.blit(hit_text, (20, 20))
-    screen.blit(miss_text, (20, 50))
+        // بدء اللعبة
+        gameLoop();
+    </script>
 
-    pygame.display.flip()
-    clock.tick(60)
-
-pygame.quit()
-
+</body>
+</html>
